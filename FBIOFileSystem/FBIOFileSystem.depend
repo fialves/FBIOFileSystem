@@ -1,0 +1,20 @@
+# depslib dependency file v1.0
+1434691625 source:/home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/src/diskUtils.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"../include/t2fs.h"
+	"../include/apidisk.h"
+
+1432511324 /home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/include/t2fs.h
+
+1415120908 /home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/include/apidisk.h
+
+1434689906 source:/home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/src/t2fs.c
+
+1434694216 source:/home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/teste/test1.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"../include/t2fs.h"
+
