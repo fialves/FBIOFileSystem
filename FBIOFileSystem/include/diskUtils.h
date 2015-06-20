@@ -1,2 +1,3 @@
-int writeBlock (unsigned int block, char *buffer);
-int readBlock (unsigned int block, char *buffer);
+int write_block (unsigned int block, char *buffer);
+int read_block (unsigned int block, char *buffer);
+int get_superblock_information();

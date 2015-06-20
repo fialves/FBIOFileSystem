@@ -73,4 +73,13 @@ int closedir2 (DIR2 handle);
 int chdir2 (char *pathname);
 int getcwd2 (char *pathname, int size);
 
+//-------------------------
+//TODO: send the code below to a new file cause these functions are "low-leveled"
+//-------------------------
+int write_block (unsigned int block, char *buffer);
+int read_block (unsigned int block, char *buffer);
+int get_superblock_information();
+
+void superblock_test();
+
 #endif

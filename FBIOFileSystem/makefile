@@ -16,15 +16,20 @@ SRC_DIR=./src
 TST_DIR=./teste
 EXECUTABLE= FBIOFileSystem
 
-test: libt2fs.a
-	$(CC) -o $(TST_DIR)/test1 $(TST_DIR)/test1.c -L $(LIB_DIR) -lt2fs -Wall
+Debug: all
 
-libt2fs.a: t2fs.o 
-	ar crs $(LIB_DIR)/libt2fs.a diskUtils.o $(LIB_DIR)/apidisk.o
+Release: all
+
+all: t2fs.o libt2fs.a
+
+test: all
+	$(CC) -o $(BIN_DIR)/Test/test1 $(TST_DIR)/test1.c -L$(LIB_DIR) -lt2fs -Wall
+
+libt2fs.a: t2fs.o
+	ar crs $(LIB_DIR)/libt2fs.a $(LIB_DIR)/t2fs.o $(LIB_DIR)/apidisk.o
  
-t2fs.o: $(SRC_DIR)/diskUtils.c
-	gcc -c $(SRC_DIR)/t2fs.c -Wall	
-	gcc -c $(SRC_DIR)/diskUtils.c -Wall
+t2fs.o: $(INC_DIR)/t2fs.h
+	$(CC) -c $(SRC_DIR)/t2fs.c -o $(LIB_DIR)/t2fs.o -Wall
 	
 clean:
 	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
