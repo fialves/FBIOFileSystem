@@ -20,3 +20,20 @@
 
 1434694167 /home/aluno/Desktop/FBIOFileSystem/FBIOFileSystem/include/diskUtils.h
 
+1434766072 source:/home/aluno/Desktop/FBIOFileSystem/src/t2fs.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"../include/t2fs.h"
+	"../include/apidisk.h"
+
+1434766142 /home/aluno/Desktop/FBIOFileSystem/include/t2fs.h
+
+1415120908 /home/aluno/Desktop/FBIOFileSystem/include/apidisk.h
+
+1434766362 source:/home/aluno/Desktop/FBIOFileSystem/teste/test1.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"../include/t2fs.h"
+

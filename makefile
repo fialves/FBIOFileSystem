@@ -22,7 +22,7 @@ Release: all
 
 all: t2fs.o libt2fs.a
 
-test: all
+Test: all
 	$(CC) -o $(BIN_DIR)/Test/test1 $(TST_DIR)/test1.c -L$(LIB_DIR) -lt2fs -Wall
 
 libt2fs.a: t2fs.o

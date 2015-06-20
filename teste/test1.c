@@ -5,9 +5,13 @@
 
 int main(){
     char *names;
-    if(get_superblock_information() == 0){
-        identify2(names,256);
-        printf("It's alright.. be cool!\n");
+    if(init_superblock() == 0){
+        if(init_bitmap_blocks() == 0){
+            if(init_bitmap_inodes() == 0){
+                identify2(names,256);
+                printf("It's alright.. be cool!\n");
+            }
+        }
     }
     else
         printf("Bad.. too bad...\n");
