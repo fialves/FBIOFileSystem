@@ -5,18 +5,19 @@
 #include "../include/apidisk.h"
 
 #define EOS '\0'
-#define SECTOR_PER_BLOCK (blockSize/SECTOR_SIZE)
-#define BLOCK_TO_SECTORS(block) ((block*SECTOR_PER_BLOCK)+1)
+#define SECTORS_PER_BLOCK (blockSize/SECTOR_SIZE)
+#define BLOCK_TO_SECTORS(block) ((block*SECTORS_PER_BLOCK))
 
-#define BITMAP_BLOCKS_SIZE (blockSize)
-#define BITMAP_INODES_SIZE (blockSize)
+#define BITMAP_BLOCKS_SIZE (superblock.NofBlocks/sizeof(char))
+#define BITMAP_INODES_SIZE (superblock.NofBlocks/sizeof(char))
 
 #define INODE_SIZE 64*sizeof(BYTE)
 
 
+
 struct t2fs_superbloco superblock;
-char bitmapBlock;
-char bitmapInodes;
+char *bitmapBlock;
+char *bitmapInodes;
 
 int blockSize;
 
@@ -29,6 +30,8 @@ int identify2 (char *name, int size){
     name = &identifier;
 
    // NOTE: There is no rule on PDF to "identifier>size" then I choose return -1
+   // It could be coded as:
+   // memcpy(name, &identifier, sizeof(size));
     return 0;
 }
 
@@ -56,14 +59,12 @@ int write_block (unsigned int block, char *buffer){
 }
 // TODO: test it!
 int read_block (unsigned int block, char *paramBuffer){
-//    char tmpBlock[SECTOR_SIZE];
     int i;
+    char tempSector[SECTOR_SIZE];
 
-    for(i=0; i < SECTOR_PER_BLOCK ; i++){
-        // Start reading into the sector, if it`s okay then copy to buffer
+    for(i=0; i < SECTORS_PER_BLOCK ; i++){
+        // Read sectors and store in paramBuffer
         if(read_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
-//        if(read_sector((block*blockSize)+i, tmpBlock)!= 0) return -1;
-//        memcpy(paramBuffer+(i*SECTOR_SIZE), tmpBlock, SECTOR_SIZE);
     }
     return 0;
 }
@@ -94,16 +95,16 @@ int init_superblock(){
 
 int init_bitmap_blocks(){
     char bitmapBuffer[blockSize];
-    printf("BkSize= %d\n",blockSize);
+
     int isRead = read_block(superblock.BitmapBlocks, bitmapBuffer);
 
-    // NOTE: May blocksize gonna be wrong here?!
-
     if(isRead == 0){
-        bitmapBlock = malloc(superblock.NofBlocks*sizeof(char));
-        memcpy(&bitmapBlock, &bitmapBuffer, superblock.NofBlocks*sizeof(char));
+        bitmapBlock = (char*)calloc(BITMAP_BLOCKS_SIZE, sizeof(char));
 
-        bitmap_blocks_test();
+        //if(memcpy(bitmapBlock, &bitmapBuffer, sizeof(bitmapBuffer)) != 0) return -1;
+        memcpy(bitmapBlock, bitmapBuffer, BITMAP_BLOCKS_SIZE);
+
+        bitmap_blocks_test(); // DEBUG LINE
 
         return 0;
     }
@@ -113,19 +114,13 @@ int init_bitmap_blocks(){
 
 int init_bitmap_inodes(){
     char bitmapBuffer[blockSize];
-    printf("BkSize2= %d\n",blockSize);
     int isRead = read_block(superblock.BitmapInodes, bitmapBuffer);
 
-    // NOTE: May blocksize gonna be wrong here?!
-
     if(isRead == 0){
+        bitmapInodes = (char*)calloc(BITMAP_INODES_SIZE,sizeof(char));
 
-        bitmapInodes = malloc(blockSize*sizeof(char)); // TODO: Calculate NofInodes!
-
-        memcpy(&bitmapInodes, &bitmapBuffer, blockSize*sizeof(char));
-
-        printf("BkSize3= %d\n",blockSize); // blocksize = 0 ?!?!
-
+        //if(memcpy(bitmapBlock, &bitmapBuffer, sizeof(bitmapBuffer)) != 0) return -1;
+        memcpy(bitmapInodes, bitmapBuffer, BITMAP_INODES_SIZE);
 
         bitmap_inodes_test();
 
@@ -159,55 +154,57 @@ void superblock_test(){
 void bitmap_blocks_test(){
     printf("\n---------------------\nDEBUG: Bitmap of Blocks \n---------------------\n");
     int i = 0;
-    char *bitmapPtr;
-    char mask = 128;
+    int bitIndex = 0;
+    int mask = 0b10000000;
+    int j = 0;
 
-    bitmapPtr = &bitmapBlock;
+    while(i < superblock.NofBlocks){
+        if(((mask>>bitIndex) & bitmapBlock[j]) != 0) {
+            printf("1");
+        }
+        else {
+            printf("0");
+        }
 
-    while(i < blockSize){
-        if((*bitmapPtr & mask) != mask) printf("1");
-        else printf("0");
-
-//        printf("%d",*bitmapPtr);
+        if(bitIndex == 7) {
+            bitIndex = 0;
+            mask = 0b10000000;
+            j++;
+        }
+        else {
+            bitIndex++;
+        }
 
         i++;
 
-        if(mask == 1) {
-            mask = 128;
-            bitmapPtr++;
-        }
-        else mask >> 1;
-
     }
-
-    printf("\n\n=>Blocos : %d\n",i);
-    printf("BkSize= %d\n",blockSize);
 }
 
 void bitmap_inodes_test(){
     printf("\n---------------------\nDEBUG: Bitmap of I-nodes \n---------------------\n");
     int i = 0;
-    char *bitmapPtr;
-    char mask = 128;
+    int bitIndex = 0;
+    int mask = 0b10000000;
+    int j = 0;
 
-    bitmapPtr = &bitmapInodes;
+    while(i < superblock.NofBlocks){
+        if(((mask>>bitIndex) & bitmapInodes[j]) != 0) {
+            printf("1");
+        }
+        else {
+            printf("0");
+        }
 
-    while(i < blockSize){
-//        if((*bitmapPtr & mask) != mask) printf("1");
-//        else printf("0");
-
-        printf("%d",*bitmapPtr);
+        if(bitIndex == 7) {
+            bitIndex = 0;
+            mask = 0b10000000;
+            j++;
+        }
+        else {
+            bitIndex++;
+        }
 
         i++;
 
-        if(mask == 1) {
-            mask = 128;
-            bitmapPtr++;
-        }
-        else mask >> 1;
-
     }
-
-    printf("\n\n=>I-nodes : %d\n",i);
-    printf("BkSize= %d\n",blockSize);
 }
