@@ -66,6 +66,7 @@ int read_block (unsigned int block, char *paramBuffer){
         // Read sectors and store in paramBuffer
         if(read_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
     }
+
     return 0;
 }
 
@@ -155,11 +156,15 @@ void bitmap_blocks_test(){
     printf("\n---------------------\nDEBUG: Bitmap of Blocks \n---------------------\n");
     int i = 0;
     int bitIndex = 0;
-    int mask = 0b10000000;
+    int mask = 0b00000001;
     int j = 0;
 
     while(i < superblock.NofBlocks){
-        if(((mask>>bitIndex) & bitmapBlock[j]) != 0) {
+//        if(bitIndex==0){
+//            printf("\nBitmapBlocks: %d\n",bitmapBlock[j]);
+//        }
+
+        if(((mask<<bitIndex) & bitmapBlock[j]) != 0) {
             printf("1");
         }
         else {
@@ -168,7 +173,7 @@ void bitmap_blocks_test(){
 
         if(bitIndex == 7) {
             bitIndex = 0;
-            mask = 0b10000000;
+            mask = 0b00000001;
             j++;
         }
         else {
@@ -184,11 +189,11 @@ void bitmap_inodes_test(){
     printf("\n---------------------\nDEBUG: Bitmap of I-nodes \n---------------------\n");
     int i = 0;
     int bitIndex = 0;
-    int mask = 0b10000000;
+    int mask = 0b00000001;
     int j = 0;
 
     while(i < superblock.NofBlocks){
-        if(((mask>>bitIndex) & bitmapInodes[j]) != 0) {
+        if(((mask<<bitIndex) & bitmapInodes[j]) != 0) {
             printf("1");
         }
         else {
@@ -197,7 +202,7 @@ void bitmap_inodes_test(){
 
         if(bitIndex == 7) {
             bitIndex = 0;
-            mask = 0b10000000;
+            mask = 0b00000001;
             j++;
         }
         else {
