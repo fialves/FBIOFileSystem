@@ -12,6 +12,8 @@
 #define BITMAP_INODES_SIZE (superblock.NofBlocks/sizeof(char))
 
 #define INODE_SIZE 64
+#define RECORDS_PER_BLOCK 16
+#define DATA_POINTER_SIZE 10
 
 struct t2fs_superbloco superblock;
 char *bitmapBlock;
@@ -43,6 +45,7 @@ int write_block (unsigned int block, char *paramBuffer){
         if(write_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
     }
 
+    free(tempSector);
     return 0;
 }
 
@@ -55,6 +58,7 @@ int read_block (unsigned int block, char *paramBuffer){
         if(read_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
     }
 
+    free(tempSector);
     return 0;
 }
 
@@ -70,18 +74,23 @@ int read_inode(int position,struct t2fs_inode *inode){
         memcpy(&(inode->singleIndPtr), &inodeBuffer[40], sizeof(DWORD));
         memcpy(&(inode->doubleIndPtr), &inodeBuffer[44], sizeof(DWORD));
 
+        free(blockBuffer);
+        free(inodeBuffer);
         return 0;
     }
+    free(blockBuffer);
+    free(inodeBuffer);
+    return -1;
 }
 
-int read_records_per_block(struct t2fs_inode *inode,struct t2fs_record *record){
+int read_records_per_block(unsigned int position,struct t2fs_record *record){
     char blockBuffer[blockSize];
     int i = 0;
-
-    int isRead = read_block(inode->dataPtr[0],blockBuffer);
+    printf("%d",position);
+    int isRead = read_block(position,blockBuffer);
 
     if(isRead == 0){
-        for(i=0; i < 16; i++){
+        for(i=0; i < RECORDS_PER_BLOCK; i++){
             memcpy(&record[i], &blockBuffer[i*64], sizeof(struct t2fs_record));
 
             // Debug Start
@@ -90,11 +99,52 @@ int read_records_per_block(struct t2fs_inode *inode,struct t2fs_record *record){
             printf("Record Name: %s\n", record[i].name);
             printf("Record BlocksFileSize: %d\n", record[i].blocksFileSize);
             printf("Record BytesFileSize: %d\n\n", record[i].bytesFileSize);
+            printf("Record Inode: %d\n\n", record[i].i_node);
             // Debug End
         }
+        free(blockBuffer);
         return 0;
     }
+    free(blockBuffer);
     return -1;
+}
+
+int mkdir2 (char *pathname){
+    struct t2fs_inode currentInode;
+    struct t2fs_record currentRecord[RECORDS_PER_BLOCK];
+    int i = 0,pathType = 0,isRead = 0;
+
+    // Verificar se eh absoluto ou relativo
+    if(pathname[0] == '/')
+        pathType = 0;
+    else if(pathname[0] == '.')
+        pathType = 1;
+
+    // Navega nos i-nodes confirmando o nome do diretorio
+    if(pathType == 0){
+        isRead = read_inode(0, &currentInode);
+        if(isRead == 0){
+            for(i=0; i < DATA_POINTER_SIZE; i++){
+                if(currentInode.dataPtr[i] != -1){
+                    read_records_per_block(currentInode.dataPtr[i],currentRecord);
+                }
+            }
+
+            // TODO: else: procurar nos SinglePtr
+            // TODO: else: procurar nos DoublePtr
+        }
+    }
+
+    // Chegando ate o fim do pathname, cria novo i-node
+
+    return 0;
+}
+
+int rmdir2 (char *pathname){
+    // Navega nos i-nodes confirmando o nome do diretorio
+    // Chegando ate o fim do pathname, remove o i-node
+
+    return 0;
 }
 
 int init_superblock(){
@@ -132,10 +182,10 @@ int init_bitmap_blocks(){
         memcpy(bitmapBlock, bitmapBuffer, BITMAP_BLOCKS_SIZE);
 
 //        test_bitmap_blocks(); // DEBUG
-
+        free(bitmapBuffer);
         return 0;
     }
-
+    free(bitmapBuffer);
     return -1;
 }
 /// XXX: could be a new function to initialize generic bitmaps; in: INODE, BLOCKS, etc...
@@ -149,10 +199,10 @@ int init_bitmap_inodes(){
         memcpy(bitmapInodes, bitmapBuffer, BITMAP_INODES_SIZE);
 
 //        test_bitmap_inodes();//DEBUG
-
+        free(bitmapBuffer);
         return 0;
     }
-
+    free(bitmapBuffer);
     return -1;
 }
 
@@ -226,7 +276,7 @@ void test_bitmap_inodes(){
 void test_inodes_and_records(){
     struct t2fs_inode *inode;
     char blockBuffer[blockSize];
-    struct t2fs_record recordBuffer[16];
+    struct t2fs_record recordBuffer[RECORDS_PER_BLOCK];
     int i=0;
 
     int isRead = read_inode(0, inode);
@@ -234,7 +284,9 @@ void test_inodes_and_records(){
     if(isRead == 0){
         printf("\n===== Inode Content ======\n");
         printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
-        read_records_per_block(inode, recordBuffer);
+        read_records_per_block(inode->dataPtr[0], recordBuffer);
     }
 
+    free(inode);
+    free(blockBuffer);
 }

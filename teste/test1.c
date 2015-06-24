@@ -8,9 +8,12 @@ int main(){
     if(init_superblock() == 0){
         if(init_bitmap_blocks() == 0){
             if(init_bitmap_inodes() == 0){
-                test_inodes_and_records();
-                identify2(names,256);
-                printf("\nIt's alright.. be cool!\n");
+                if(mkdir2("/teste/123") == 0){
+//                    test_inodes_and_records();
+
+                    identify2(names,256);
+                    printf("\nIt's alright.. be cool!\n");
+                }
             }
         }
     }

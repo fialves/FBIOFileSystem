@@ -79,7 +79,7 @@ int getcwd2 (char *pathname, int size);
 int write_block (unsigned int block, char *buffer);
 int read_block (unsigned int block, char *buffer);
 int read_inode(int position,struct t2fs_inode *inode);
-int read_record_per_block(struct t2fs_inode *inode,struct t2fs_record *record);
+int read_records_per_block(unsigned int position,struct t2fs_record *record);
 int init_superblock();
 
 
