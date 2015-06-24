@@ -16,24 +16,24 @@ typedef unsigned int DWORD;
 
 /** Superbloco */
 struct t2fs_superbloco {
-    char    Id[4];          /* IdentificaÁ„o do sistema de arquivo. … formado pelas letras ìT2FSî. */
-    WORD    Version;        /* Vers„o atual desse sistema de arquivos: (valor fixo 7DE=2014; 2=2 semestre). */
+    char    Id[4];          /* Identifica√ß√£o do sistema de arquivo. √â formado pelas letras ‚ÄúT2FS‚Äù. */
+    WORD    Version;        /* Vers√£o atual desse sistema de arquivos: (valor fixo 7DE=2014; 2=2 semestre). */
     WORD    SuperBlockSize; /* Quantidade de setores  que formam o superbloco. (fixo em 1 setor) */
-    DWORD   DiskSize;       /* Tamanho total da partiÁ„o T2FS, incluindo o tamanho do superblock. */
-    DWORD   NofBlocks;      /* Quantidade total de blocos de dados na partiÁ„o T2FS (1024 blocos). */
+    DWORD   DiskSize;       /* Tamanho total da parti√ß√£o T2FS, incluindo o tamanho do superblock. */
+    DWORD   NofBlocks;      /* Quantidade total de blocos de dados na parti√ß√£o T2FS (1024 blocos). */
     DWORD   BlockSize;      /* Tamanho de um bloco.*/
-    DWORD   BitmapBlocks;	/* Primeiro bloco lÛgico do bitmap de blocos livres e ocupados*/
-    DWORD   BitmapInodes;	/* Primeiro bloco lÛgico do bitmap de i-nodes livres e ocupados.*/
-    DWORD   InodeBlock;		/* Primeiro bloco lÛgico da ·rea de i-nodes*/
-    DWORD   FirstDataBlock;	/* Primeiro bloco lÛgico da ·rea de blocos de dados.*/
+    DWORD   BitmapBlocks;	/* Primeiro bloco l√≥gico do bitmap de blocos livres e ocupados*/
+    DWORD   BitmapInodes;	/* Primeiro bloco l√≥gico do bitmap de i-nodes livres e ocupados.*/
+    DWORD   InodeBlock;		/* Primeiro bloco l√≥gico da √°rea de i-nodes*/
+    DWORD   FirstDataBlock;	/* Primeiro bloco l√≥gico da √°rea de blocos de dados.*/
 } __attribute__((packed));
 
-/** Registro de diretÛrio (entrada de diretÛrio) */
+/** Registro de diret√≥rio (entrada de diret√≥rio) */
 struct t2fs_record {
-    BYTE    TypeVal;        /* Tipo da entrada. Indica se o registro È inv·lido (0xFF), arquivo (0x01 ou diretÛrio (0x02) */
-    char    name[31];       /* Nome do arquivo. : string com caracteres ASCII (0x21 atÈ 0x7A), case sensitive. */
-    DWORD   blocksFileSize; /* Tamanho do arquivo, expresso em n˙mero de blocos de dados */
-    DWORD   bytesFileSize;  /* Tamanho do arquivo. Expresso em n˙mero de bytes. */
+    BYTE    TypeVal;        /* Tipo da entrada. Indica se o registro √© inv√°lido (0xFF), arquivo (0x01 ou diret√≥rio (0x02) */
+    char    name[31];       /* Nome do arquivo. : string com caracteres ASCII (0x21 at√© 0x7A), case sensitive. */
+    DWORD   blocksFileSize; /* Tamanho do arquivo, expresso em n√∫mero de blocos de dados */
+    DWORD   bytesFileSize;  /* Tamanho do arquivo. Expresso em n√∫mero de bytes. */
     DWORD   i_node;         /* i-node do arquivo */
     char    Reserved[20];
 } __attribute__((packed));
@@ -41,9 +41,9 @@ struct t2fs_record {
 /** i-node */
 struct t2fs_inode {
     DWORD   dataPtr[10];    /* Ponteiros diretos para blocos de dados do arquivo */
-    DWORD   singleIndPtr;   /* Ponteiro de indireÁ„o simples */
-    DWORD   doubleIndPtr;   /* Ponteiro de indireÁ„o dupla */
-    char    Reserved[16];   /* N„o usados */
+    DWORD   singleIndPtr;   /* Ponteiro de indire√ß√£o simples */
+    DWORD   doubleIndPtr;   /* Ponteiro de indire√ß√£o dupla */
+    char    Reserved[16];   /* N√£o usados */
 } __attribute__((packed));
 
 #define MAX_FILE_NAME_SIZE 255
@@ -74,13 +74,18 @@ int chdir2 (char *pathname);
 int getcwd2 (char *pathname, int size);
 
 //-------------------------
-//TODO: send the code below to a new file cause these functions are "low-leveled"
+///TODO: send the code below to a new file cause these functions are "low-leveled"
 //-------------------------
 int write_block (unsigned int block, char *buffer);
 int read_block (unsigned int block, char *buffer);
+int read_inode(int position,struct t2fs_inode *inode);
+int read_record_per_block(struct t2fs_inode *inode,struct t2fs_record *record);
 int init_superblock();
 
-void superblock_test();
-void bitmap_blocks_test();
-void bitmap_inodes_test();
+
+/// Test Functions
+void test_superblock();
+void test_bitmap_blocks();
+void test_bitmap_inodes();
+void test_inodes_and_records();
 #endif

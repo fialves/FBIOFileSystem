@@ -11,9 +11,7 @@
 #define BITMAP_BLOCKS_SIZE (superblock.NofBlocks/sizeof(char))
 #define BITMAP_INODES_SIZE (superblock.NofBlocks/sizeof(char))
 
-#define INODE_SIZE 64*sizeof(BYTE)
-
-
+#define INODE_SIZE 64
 
 struct t2fs_superbloco superblock;
 char *bitmapBlock;
@@ -29,35 +27,25 @@ int identify2 (char *name, int size){
     if(size < sizeof(identifier)) return -1;
     name = &identifier;
 
-   // NOTE: There is no rule on PDF to "identifier>size" then I choose return -1
+   /// NOTE: There is no rule on PDF to "identifier>size" then I choose return -1
    // It could be coded as:
    // memcpy(name, &identifier, sizeof(size));
     return 0;
 }
 
-// TODO: test it!
-int write_block (unsigned int block, char *buffer){
-    unsigned int sector=block*4;
-    char tmp_block[SECTOR_SIZE];
+/// TODO: test it!
+int write_block (unsigned int block, char *paramBuffer){
+    int i;
+    char tempSector[SECTOR_SIZE];
 
-    // initialize buffer as empty
-    memcpy(tmp_block, buffer, SECTOR_SIZE * sizeof(char));
-
-    // start writing into the sector, if it's okay thens get next "sector" into the buffer
-    if(write_sector(sector, tmp_block)!= 0) return -1;
-    memcpy(tmp_block, buffer+SECTOR_SIZE, SECTOR_SIZE * sizeof(char));
-
-    if(write_sector(sector+1, tmp_block)!= 0) return -1;
-    memcpy(tmp_block, buffer + 2*SECTOR_SIZE, SECTOR_SIZE * sizeof(char));
-
-    if(write_sector(sector+2, tmp_block)!= 0) return -1;
-    memcpy(tmp_block, buffer + 3*SECTOR_SIZE, SECTOR_SIZE * sizeof(char));
-
-    if(write_sector(sector+3, tmp_block)!= 0) return -1;
+    for(i=0; i < SECTORS_PER_BLOCK ; i++){
+        // Read sectors and store in paramBuffer
+        if(write_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
+    }
 
     return 0;
 }
-// TODO: test it!
+
 int read_block (unsigned int block, char *paramBuffer){
     int i;
     char tempSector[SECTOR_SIZE];
@@ -68,6 +56,45 @@ int read_block (unsigned int block, char *paramBuffer){
     }
 
     return 0;
+}
+
+int read_inode(int position,struct t2fs_inode *inode){
+    char inodeBuffer[INODE_SIZE];
+    char blockBuffer[blockSize];
+    int isRead = read_block(superblock.InodeBlock+position, blockBuffer);
+
+    if(isRead == 0){
+        memcpy(inodeBuffer,&blockBuffer[position*64],sizeof(struct t2fs_inode));
+
+        memcpy(inode->dataPtr, &inodeBuffer[0], sizeof(DWORD)*10);
+        memcpy(&(inode->singleIndPtr), &inodeBuffer[40], sizeof(DWORD));
+        memcpy(&(inode->doubleIndPtr), &inodeBuffer[44], sizeof(DWORD));
+
+        return 0;
+    }
+}
+
+int read_records_per_block(struct t2fs_inode *inode,struct t2fs_record *record){
+    char blockBuffer[blockSize];
+    int i = 0;
+
+    int isRead = read_block(inode->dataPtr[0],blockBuffer);
+
+    if(isRead == 0){
+        for(i=0; i < 16; i++){
+            memcpy(&record[i], &blockBuffer[i*64], sizeof(struct t2fs_record));
+
+            // Debug Start
+            printf("\n===== Record Content ======\n");
+            printf("Record Type: %d\n", record[i].TypeVal);
+            printf("Record Name: %s\n", record[i].name);
+            printf("Record BlocksFileSize: %d\n", record[i].blocksFileSize);
+            printf("Record BytesFileSize: %d\n\n", record[i].bytesFileSize);
+            // Debug End
+        }
+        return 0;
+    }
+    return -1;
 }
 
 int init_superblock(){
@@ -87,7 +114,7 @@ int init_superblock(){
             memcpy(&(superblock.InodeBlock), &buffer[28], 4*sizeof(BYTE));
             memcpy(&(superblock.FirstDataBlock), &buffer[32], 4*sizeof(BYTE));
 
-            superblock_test();
+//            test_superblock(); // DEBUG
         }
         return 0;
     }
@@ -102,17 +129,16 @@ int init_bitmap_blocks(){
     if(isRead == 0){
         bitmapBlock = (char*)calloc(BITMAP_BLOCKS_SIZE, sizeof(char));
 
-        //if(memcpy(bitmapBlock, &bitmapBuffer, sizeof(bitmapBuffer)) != 0) return -1;
         memcpy(bitmapBlock, bitmapBuffer, BITMAP_BLOCKS_SIZE);
 
-        bitmap_blocks_test(); // DEBUG LINE
+//        test_bitmap_blocks(); // DEBUG
 
         return 0;
     }
 
     return -1;
 }
-
+/// XXX: could be a new function to initialize generic bitmaps; in: INODE, BLOCKS, etc...
 int init_bitmap_inodes(){
     char bitmapBuffer[blockSize];
     int isRead = read_block(superblock.BitmapInodes, bitmapBuffer);
@@ -120,10 +146,9 @@ int init_bitmap_inodes(){
     if(isRead == 0){
         bitmapInodes = (char*)calloc(BITMAP_INODES_SIZE,sizeof(char));
 
-        //if(memcpy(bitmapBlock, &bitmapBuffer, sizeof(bitmapBuffer)) != 0) return -1;
         memcpy(bitmapInodes, bitmapBuffer, BITMAP_INODES_SIZE);
 
-        bitmap_inodes_test();
+//        test_bitmap_inodes();//DEBUG
 
         return 0;
     }
@@ -135,11 +160,11 @@ int get_free_block(){
     return 0;
 }
 
-// MARK: Testes
+/// MARK: Testes
 
-void superblock_test(){
+void test_superblock(){
     printf("\n---------------------\nDEBUG: Superblock Information\n---------------------\n");
-    //FIXME: somehow there are some extra chars in superblock.Id
+    ///FIXME: somehow there are some extra chars in superblock.Id
     printf("ID:%s\n",superblock.Id);
     printf("Version:%x\n",superblock.Version);
     printf("SuperblockSize:%x\n",superblock.SuperBlockSize);
@@ -152,7 +177,7 @@ void superblock_test(){
     printf("FirstDatablock:%d\n\n",superblock.FirstDataBlock);
 }
 
-void bitmap_blocks_test(){
+void test_bitmap_blocks(){
     printf("\n---------------------\nDEBUG: Bitmap of Blocks \n---------------------\n");
     int i = 0;
     int bitIndex = 0;
@@ -160,16 +185,7 @@ void bitmap_blocks_test(){
     int j = 0;
 
     while(i < superblock.NofBlocks){
-//        if(bitIndex==0){
-//            printf("\nBitmapBlocks: %d\n",bitmapBlock[j]);
-//        }
-
-        if(((mask<<bitIndex) & bitmapBlock[j]) != 0) {
-            printf("1");
-        }
-        else {
-            printf("0");
-        }
+        ((((mask<<bitIndex) & bitmapBlock[j]) != 0) ? printf("1") : printf("0")); // print bit
 
         if(bitIndex == 7) {
             bitIndex = 0;
@@ -181,11 +197,10 @@ void bitmap_blocks_test(){
         }
 
         i++;
-
     }
 }
 
-void bitmap_inodes_test(){
+void test_bitmap_inodes(){
     printf("\n---------------------\nDEBUG: Bitmap of I-nodes \n---------------------\n");
     int i = 0;
     int bitIndex = 0;
@@ -193,12 +208,7 @@ void bitmap_inodes_test(){
     int j = 0;
 
     while(i < superblock.NofBlocks){
-        if(((mask<<bitIndex) & bitmapInodes[j]) != 0) {
-            printf("1");
-        }
-        else {
-            printf("0");
-        }
+        ((((mask<<bitIndex) & bitmapBlock[j]) != 0) ? printf("1") : printf("0")); // print bit
 
         if(bitIndex == 7) {
             bitIndex = 0;
@@ -210,6 +220,21 @@ void bitmap_inodes_test(){
         }
 
         i++;
-
     }
+}
+
+void test_inodes_and_records(){
+    struct t2fs_inode *inode;
+    char blockBuffer[blockSize];
+    struct t2fs_record recordBuffer[16];
+    int i=0;
+
+    int isRead = read_inode(0, inode);
+
+    if(isRead == 0){
+        printf("\n===== Inode Content ======\n");
+        printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
+        read_records_per_block(inode, recordBuffer);
+    }
+
 }
