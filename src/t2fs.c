@@ -45,7 +45,6 @@ int write_block (unsigned int block, char *paramBuffer){
         if(write_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
     }
 
-    free(tempSector);
     return 0;
 }
 
@@ -58,7 +57,6 @@ int read_block (unsigned int block, char *paramBuffer){
         if(read_sector(BLOCK_TO_SECTORS(block)+i, paramBuffer+(i*SECTOR_SIZE)) != 0) return -1;
     }
 
-    free(tempSector);
     return 0;
 }
 
@@ -74,12 +72,9 @@ int read_inode(int position,struct t2fs_inode *inode){
         memcpy(&(inode->singleIndPtr), &inodeBuffer[40], sizeof(DWORD));
         memcpy(&(inode->doubleIndPtr), &inodeBuffer[44], sizeof(DWORD));
 
-        free(blockBuffer);
-        free(inodeBuffer);
         return 0;
     }
-    free(blockBuffer);
-    free(inodeBuffer);
+
     return -1;
 }
 
@@ -102,23 +97,28 @@ int read_records_per_block(unsigned int position,struct t2fs_record *record){
             printf("Record Inode: %d\n\n", record[i].i_node);
             // Debug End
         }
-        free(blockBuffer);
         return 0;
     }
-    free(blockBuffer);
     return -1;
 }
 
 int mkdir2 (char *pathname){
     struct t2fs_inode currentInode;
     struct t2fs_record currentRecord[RECORDS_PER_BLOCK];
-    int i = 0,pathType = 0,isRead = 0;
+    int i,j,pathType,isRead;
+    char *subpath;
 
     // Verificar se eh absoluto ou relativo
     if(pathname[0] == '/')
         pathType = 0;
     else if(pathname[0] == '.')
         pathType = 1;
+
+    subpath = strtok(pathname," /");
+    while(subpath != NULL){
+        printf("%s\n",subpath);
+        subpath = strtok(NULL,"/");
+    }
 
     // Navega nos i-nodes confirmando o nome do diretorio
     if(pathType == 0){
@@ -129,14 +129,11 @@ int mkdir2 (char *pathname){
                     read_records_per_block(currentInode.dataPtr[i],currentRecord);
                 }
             }
-
             // TODO: else: procurar nos SinglePtr
             // TODO: else: procurar nos DoublePtr
         }
     }
-
-    // Chegando ate o fim do pathname, cria novo i-node
-
+    // TODO:Chegando ate o fim do pathname, cria novo i-node
     return 0;
 }
 
@@ -182,10 +179,10 @@ int init_bitmap_blocks(){
         memcpy(bitmapBlock, bitmapBuffer, BITMAP_BLOCKS_SIZE);
 
 //        test_bitmap_blocks(); // DEBUG
-        free(bitmapBuffer);
+
         return 0;
     }
-    free(bitmapBuffer);
+
     return -1;
 }
 /// XXX: could be a new function to initialize generic bitmaps; in: INODE, BLOCKS, etc...
@@ -199,10 +196,10 @@ int init_bitmap_inodes(){
         memcpy(bitmapInodes, bitmapBuffer, BITMAP_INODES_SIZE);
 
 //        test_bitmap_inodes();//DEBUG
-        free(bitmapBuffer);
+
         return 0;
     }
-    free(bitmapBuffer);
+
     return -1;
 }
 
@@ -286,7 +283,6 @@ void test_inodes_and_records(){
         printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
         read_records_per_block(inode->dataPtr[0], recordBuffer);
     }
+    inode = NULL;
 
-    free(inode);
-    free(blockBuffer);
 }
