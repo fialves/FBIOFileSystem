@@ -81,6 +81,10 @@ int read_block (unsigned int block, char *buffer);
 int read_inode(int position,struct t2fs_inode *inode);
 int read_records_per_block(unsigned int position,struct t2fs_record *record);
 int init_superblock();
+int get_free_inode();
+int get_free_block();
+int add_record(struct t2fs_record *record);
+int add_inode_record(struct t2fs_inode *inode);
 
 
 /// Test Functions

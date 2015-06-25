@@ -4,15 +4,17 @@
 #include "../include/t2fs.h"
 
 int main(){
-    char *names;
-    char path[31] = "/teste/123";
+    char names[10];
+    int i = 0;
     if(init_superblock() == 0){
         if(init_bitmap_blocks() == 0){
             if(init_bitmap_inodes() == 0){
-                if(mkdir2(path) == 0){
+                if(mkdir2("/") == 0){
 //                    test_inodes_and_records();
+                    identify2(names,10);
+                    printf("\n%d\n",get_free_block());
 
-                    identify2(names,256);
+                    puts(names);
                     printf("\nIt's alright.. be cool!\n");
                 }
             }
