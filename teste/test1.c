@@ -9,14 +9,15 @@ int main(){
     if(init_superblock() == 0){
         if(init_bitmap_blocks() == 0){
             if(init_bitmap_inodes() == 0){
-                if(mkdir2("/") == 0){
-//                    test_inodes_and_records();
-                    identify2(names,10);
-                    printf("\n%d\n",get_free_block());
+  //              if(mkdir2("/test") == 0){
+                     test_inodes_and_records();
+//                     identify2(names,10);
+//                     puts(names);
+//                     test_records();
+                    printf("\nFreeBlockMain: %d\n",get_free_block());
 
-                    puts(names);
                     printf("\nIt's alright.. be cool!\n");
-                }
+    //            }
             }
         }
     }

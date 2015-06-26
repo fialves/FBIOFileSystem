@@ -77,6 +77,9 @@ int getcwd2 (char *pathname, int size);
 ///TODO: send the code below to a new file cause these functions are "low-leveled"
 //-------------------------
 int write_block (unsigned int block, char *buffer);
+int write_inode(unsigned int block, struct t2fs_inode *inode);
+int write_bitmap_blocks(unsigned int position);
+int write_bitmap_inode(unsigned int position);
 int read_block (unsigned int block, char *buffer);
 int read_inode(int position,struct t2fs_inode *inode);
 int read_records_per_block(unsigned int position,struct t2fs_record *record);
@@ -84,7 +87,7 @@ int init_superblock();
 int get_free_inode();
 int get_free_block();
 int add_record(struct t2fs_record *record);
-int add_inode_record(struct t2fs_inode *inode);
+int add_inode_record(struct t2fs_inode *inode, int recordPosition);
 
 
 /// Test Functions
@@ -92,4 +95,5 @@ void test_superblock();
 void test_bitmap_blocks();
 void test_bitmap_inodes();
 void test_inodes_and_records();
+void test_records();
 #endif
