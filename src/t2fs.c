@@ -1,6 +1,21 @@
+/*
+    This project was developed by Fabio I. Alves & Henrique Lopes.
+
+    Objective:
+    This is a project of Operational System class from Federal University Rio Grande do Sul
+    that challenge us to make a FileSystem
+
+    Observations:
+    Inodes: this structures was handled one by one when out of their read and write functions;
+    Records: this structures was handled in arrays sized as a block;
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+
 #include "../include/t2fs.h"
 #include "../include/apidisk.h"
 
@@ -13,7 +28,9 @@
 
 #define INODE_SIZE 64
 #define RECORD_SIZE 64
-#define RECORDS_PER_BLOCK 16
+#define RECORDS_PER_BLOCK blockSize/RECORD_SIZE
+#define INODES_PER_BLOCK blockSize/INODE_SIZE
+
 #define INODE_DATAPTR_SIZE 10
 
 #define INODE_ROOT 0
@@ -62,7 +79,6 @@ int strcpy2(char *dest, char *src, int size){
     return 0;
 }
 
-/// TODO: test it!
 int write_block (unsigned int block, char *paramBuffer){
     int i;
     char tempSector[SECTOR_SIZE];
@@ -76,51 +92,85 @@ int write_block (unsigned int block, char *paramBuffer){
 }
 
 int write_inode(unsigned int position, struct t2fs_inode *inode){
-    char inodeBuffer[blockSize],blockBuffer[blockSize];
+    char inodeBuffer[INODE_SIZE],blockBuffer[blockSize];
     int isWrote;
+    int blockPosition = floor(position/INODES_PER_BLOCK);
 
     memcpy(&inodeBuffer[0], inode->dataPtr, sizeof(DWORD)*10);
     memcpy(&inodeBuffer[40], &(inode->singleIndPtr), sizeof(DWORD));
     memcpy(&inodeBuffer[44], &(inode->doubleIndPtr), sizeof(DWORD));
 
+    read_block(ADDRESS_ABSOLUTE_INODE(blockPosition),blockBuffer);
+    memcpy(&blockBuffer[position*64], inodeBuffer, sizeof(struct t2fs_inode));
+
+    printf("\ninodeBuffer->dataPtr: \n%d",*inodeBuffer);
+    printf("\nblockBuffer->dataPtr0 in 0: \n%d\n",*(blockBuffer+(0*64)));
+    printf("\nblockBuffer->dataPtr0 in 1: \n%d\n",*(blockBuffer+(1*64)));
+    printf("\nblockBuffer->dataPtr0 in 2: \n%d\n",*(blockBuffer+(2*64)));
+    printf("\nblockBuffer->dataPtr0 in 3: \n%d\n",*(blockBuffer+(3*64)));
+
+    isWrote = write_block(ADDRESS_ABSOLUTE_INODE(blockPosition),blockBuffer);
+
+    printf("Absolute address: %d\n",ADDRESS_ABSOLUTE_INODE(blockPosition)); // just testing rounding!
+
+    if(isWrote == 0) {
+        write_bitmap_inode(position);
+        return 0;
+    }
+
+    return -1;
+}
+
+int write_records(unsigned int position, struct t2fs_record *records){
+    // In: absolute position
+    char blockBuffer[blockSize];
+    int isWrote;
+
     read_block(position,blockBuffer);
-    memcpy(&blockBuffer[position], inodeBuffer, sizeof(struct t2fs_inode));
+    memcpy(blockBuffer, records, sizeof(struct t2fs_record));
 
-    printf("\ninodeBuffer: \n%d",*inodeBuffer);
-    printf("\nblockBuffer: \n%d",*blockBuffer);
+    isWrote = write_block(position,blockBuffer);
 
-//    isWrote = write_block(position,blockBuffer);
-//
-//    if(isWrote == 0) {
-//        write_bitmap_blocks(position);
-//        return 0;
-//    }
+    printf("RECORD --> Absolute address: %d\n",position); // just testing rounding!
+
+    if(isWrote == 0) {
+        write_bitmap_blocks(position);
+        return 0;
+    }
+
     return -1;
 }
 
 int write_bitmap_blocks(unsigned int position){
-    int mask = 0b10000000;
-    int bitIndex = (position % 8)-1;
+    // In: absolute position of block
+    int mask = 0b00000001;
+    int bitIndex = (position % 8);
 
-    position = (int) position / 8;
+    position = floor(position / 8);
+    printf("\n---\nBmp_Inode \n-> position: %d\n-> bitIndex: %d",position,bitIndex);
 
+    bitmapBlock[position] = ((mask<<bitIndex) ^ bitmapBlock[position]);
 
-    bitmapBlock[position] = ((mask>>(bitIndex)) ^ bitmapBlock[position]);
-    write_block(position,bitmapBlock);
-//    test_bitmap_blocks();
+    write_block(superblock.BitmapBlocks,bitmapBlock);
+
+    test_bitmap_blocks();
 
     return 0;
 }
 
 int write_bitmap_inode(unsigned int position){
-    int mask = 0b10000000;
-    int bitIndex = (position % 8)-1;
+    // In: relative position of the inode
 
-    position = (int) position / 8;
+    int mask = 0b00000001;
+    int bitIndex = (position % 8);
 
+    position = floor(position / 8);
 
-    bitmapInodes[position] = ((mask>>(bitIndex)) ^ bitmapInodes[position]);
-    write_block(position,bitmapInodes);
+    bitmapInodes[position] = ((mask<<bitIndex) ^ bitmapInodes[position]);
+    printf("\n%d\n",bitmapInodes[position]);
+
+    write_block(superblock.BitmapInodes,bitmapInodes);
+
     test_bitmap_inodes();
 
     return 0;
@@ -139,9 +189,11 @@ int read_block (unsigned int block, char *paramBuffer){
 }
 
 int read_inode(int position,struct t2fs_inode *inode){
+    // in:  position is an integer that represents the relative position to inode(eg. root inode is position = 0)
+
     char inodeBuffer[INODE_SIZE];
     char blockBuffer[blockSize];
-    int isRead = read_block(superblock.InodeBlock+position, blockBuffer);
+    int isRead = read_block(superblock.InodeBlock+0, blockBuffer);
 
     if(isRead == 0){
         memcpy(inodeBuffer,&blockBuffer[position*64],sizeof(struct t2fs_inode));
@@ -150,6 +202,11 @@ int read_inode(int position,struct t2fs_inode *inode){
         memcpy(&(inode->singleIndPtr), &inodeBuffer[40], sizeof(DWORD));
         memcpy(&(inode->doubleIndPtr), &inodeBuffer[44], sizeof(DWORD));
 
+        printf("\nReading: inodeBuffer->dataPtr0 in 0: \n%d\n",*(blockBuffer+(0*64)));
+        printf("\nReading: inodeBuffer->dataPtr0 in 1: \n%d\n",*(blockBuffer+(1*64)));
+        printf("\nReading: inodeBuffer->dataPtr0 in 2: \n%d\n",*(blockBuffer+(2*64)));
+        printf("\nReading: inodeBuffer->dataPtr0 in 3: \n%d\n",*(blockBuffer+(3*64)));
+
         return 0;
     }
 
@@ -157,10 +214,13 @@ int read_inode(int position,struct t2fs_inode *inode){
 }
 
 int read_records_per_block(unsigned int position,struct t2fs_record *record){
+    // in: absolute position; integer represents block number
+    // out: records per block
+
     char blockBuffer[blockSize];
     int i = 0;
 
-    printf("%d",position);
+    printf("record_per_block->Position: %d\n",position);
 
     int isRead = read_block(position,blockBuffer);
 
@@ -176,7 +236,7 @@ int read_records_per_block(unsigned int position,struct t2fs_record *record){
 int mkdir2 (char *pathname){
     struct t2fs_inode currentInode, newInode;
     struct t2fs_record currentRecord[RECORDS_PER_BLOCK],newRecord[RECORDS_PER_BLOCK];
-    int i,j=0,pathType,isRead,hitDirectory = -1,freeBlockPosition = -1, freeInodePosition = -1, freeRecordPosition = -1;
+    int i,j = 0,pathType,isRead,hitDirectory = -1,freeBlockPosition = -1, freeInodePosition = -1, freeRecordPosition = -1;
     char *subpath, lastFoundedSubpath[RECORD_MAX_NAME_SIZE];
     char *pathnameBuffer;
 
@@ -274,6 +334,7 @@ int mkdir2 (char *pathname){
 
                     // 3. Add a new pointer in newInode to the t2fs_record
                     //newInode.dataPtr[0] = freeBlockPosition; /// TODO: other pointers to NULL
+                    init_records(newRecord);
 
                     newRecord[0].TypeVal = 2;
                     strcpy(newRecord[0].name,".");
@@ -301,20 +362,17 @@ int mkdir2 (char *pathname){
                     printf("Record BytesFileSize: %d\n", newRecord[1].bytesFileSize);
                     printf("Record Inode: %d\n\n", newRecord[1].i_node);
 
-                    /// TODO: initialize newInode
+                    /// TODO: initialize newRecord
                     //add_inode_record(&newInode,freeBlockPosition);
 
                     newInode.dataPtr[0] = freeBlockPosition;
                     printf("newInode.dataPtr[0]= %d",newInode.dataPtr[0]);
 
-
-                    write_inode(freeBlockPosition,&newInode);
                     // 4. Write newRecord in FirstDataBlock+freeBlockPosition
                     //    and newInode in superblock.I-nodeBlock+freeInodePosition
-
-                    /// TODO: implement write_inode(newInode) with superblock.I-nodeBlock+position
+                    write_inode(freeInodePosition,&newInode);
+                    write_records(freeBlockPosition,newRecord);
                     /// TODO: implement write_records_per_block(currentRecord/newRecord) with superblock.I-nodeBlock+position
-
 
                     // 5. Mark that free block and that new inode in their bitmaps
 
@@ -353,7 +411,7 @@ int init_superblock(){
             memcpy(&(superblock.InodeBlock), &buffer[28], 4*sizeof(BYTE));
             memcpy(&(superblock.FirstDataBlock), &buffer[32], 4*sizeof(BYTE));
 
-//            test_superblock(); // DEBUG
+            test_superblock(); // DEBUG
         }
         return 0;
     }
@@ -395,7 +453,23 @@ int init_bitmap_inodes(){
     return -1;
 }
 
+/// FIXME: somehow it isn't initializing
+int init_records(struct t2fs_record *records){
+    int i;
+    for(i=0; i < RECORDS_PER_BLOCK; i++){
+        records[i].TypeVal = RECORD_INVALID_ENTRY;
+        strcpy(records[i].name,"");
+        records[i].blocksFileSize = 0;
+        records[i].bytesFileSize = 0;
+        records[i].i_node = INODE_INVALID_ENTRY;
+    }
+
+    return 0;
+}
 int get_free_block(){
+    // Out: return relative position of free block
+    //      (eg. initial disk is occupated until position 67; free block is in position 68)
+
     int bitIndex = 0;
     int mask = 0b10000000;
     int j = 0;
@@ -416,6 +490,9 @@ int get_free_block(){
 }
 
 int get_free_inode(){
+    // Out: return relative position of free inode
+    //      (eg. initial disk has 1 inode into position 0; free inode is in position 1)
+
     int i = 0;
     int bitIndex = 0;
     int mask = 0b10000000;
@@ -427,7 +504,7 @@ int get_free_inode(){
                 bitIndex++;
             }
 
-            return ADDRESS_ABSOLUTE_INODE(((j)*8)+(8-bitIndex));
+            return ((j)*8)+(8-bitIndex);
         }
         else {
              j++;
@@ -438,8 +515,9 @@ int get_free_inode(){
 }
 
 int add_record(struct t2fs_record *record){
-    // In: record[RECORDS_PER_BLOCK]
-    // Out: new record position in record[RECORDS_PER_BLOCK];
+    //  In: record[RECORDS_PER_BLOCK]
+    //  Out: new record position in record[RECORDS_PER_BLOCK];
+    //  Append a new record
 
     int i = 0;
 
@@ -455,6 +533,10 @@ int add_record(struct t2fs_record *record){
 }
 
 int add_inode_record(struct t2fs_inode *inode, int recordPosition){
+    // In: a single inode; and a record position to be appended
+    // Out: 0 -> success; -1 -> error
+    // Append a new recordPosition in an inode pointer
+
     char indPtr[blockSize];
     int i = 0;
 
@@ -557,7 +639,7 @@ void test_inodes_and_records(){
 
     if(isRead == 0){
         printf("\n===== Inode Content ======\n");
-        printf("Inode-- DataPtr: %\n", inode);
+        printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
         read_records_per_block(inode->dataPtr[0], recordBuffer);
     }
     inode = NULL;
@@ -566,16 +648,18 @@ void test_inodes_and_records(){
 
 void test_records(){
     struct t2fs_record recordBuffer[RECORDS_PER_BLOCK];
-    int i;
+    int i,j;
 
     for(i=0; i < 2; i++){
         read_records_per_block(ADDRESS_ABSOLUTE_RECORD(i), recordBuffer);
-        printf("\n===== Record Content ======\n");
-        printf("Record Type: %d\n", recordBuffer[i].TypeVal);
-        printf("Record Name: %s\n", recordBuffer[i].name);
-        printf("Record BlocksFileSize: %d\n", recordBuffer[i].blocksFileSize);
-        printf("Record BytesFileSize: %d\n\n", recordBuffer[i].bytesFileSize);
-        printf("Record Inode: %d\n\n", recordBuffer[i].i_node);
+        for(j=0; j<RECORDS_PER_BLOCK; j++){
+            printf("\n===== Record Content ======\n");
+            printf("Record Type: %d\n", recordBuffer[j].TypeVal);
+            printf("Record Name: %s\n", recordBuffer[j].name);
+            printf("Record BlocksFileSize: %d\n", recordBuffer[j].blocksFileSize);
+            printf("Record BytesFileSize: %d\n\n", recordBuffer[j].bytesFileSize);
+            printf("Record Inode: %d\n\n", recordBuffer[j].i_node);
+        }
     }
 
 }

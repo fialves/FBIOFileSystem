@@ -78,12 +78,14 @@ int getcwd2 (char *pathname, int size);
 //-------------------------
 int write_block (unsigned int block, char *buffer);
 int write_inode(unsigned int block, struct t2fs_inode *inode);
+int write_records(unsigned int position, struct t2fs_record *records);
 int write_bitmap_blocks(unsigned int position);
 int write_bitmap_inode(unsigned int position);
 int read_block (unsigned int block, char *buffer);
 int read_inode(int position,struct t2fs_inode *inode);
 int read_records_per_block(unsigned int position,struct t2fs_record *record);
 int init_superblock();
+int init_records(struct t2fs_record *records);
 int get_free_inode();
 int get_free_block();
 int add_record(struct t2fs_record *record);

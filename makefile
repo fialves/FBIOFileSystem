@@ -23,7 +23,7 @@ Release: all
 all: t2fs.o libt2fs.a
 
 Test: all
-	$(CC) -o $(BIN_DIR)/Test/test1 $(TST_DIR)/test1.c -L$(LIB_DIR) -lt2fs -Wall
+	$(CC) -o $(BIN_DIR)/Test/test1 $(TST_DIR)/test1.c -L$(LIB_DIR) -lt2fs -lm -Wall
 
 libt2fs.a: t2fs.o
 	ar crs $(LIB_DIR)/libt2fs.a $(LIB_DIR)/t2fs.o $(LIB_DIR)/apidisk.o
