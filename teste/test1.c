@@ -9,11 +9,11 @@ int main(){
     if(init_superblock() == 0){
         if(init_bitmap_blocks() == 0){
             if(init_bitmap_inodes() == 0){
-                if(mkdir2("/test") == 0){
-                     test_inodes_and_records();
+                if(mkdir2("./ll/../u") == 0){
+//                     test_inodes_and_records();
 //                     identify2(names,10);
 //                     puts(names);
-//                     test_records();
+                     test_records();
                     printf("\nFreeBlockMain: %d\n",get_free_block());
 
                     printf("\nIt's alright.. be cool!\n");

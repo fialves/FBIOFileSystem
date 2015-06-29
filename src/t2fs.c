@@ -9,6 +9,19 @@
     Inodes: this structures was handled one by one when out of their read and write functions;
     Records: this structures was handled in arrays sized as a block;
 
+    What it can do NOW:
+    - Write and read: block; inode; records; bitmaps;
+    - Handle with inodes.dataPtr(only!);
+    - mkdir2 with: dataPtr; *Directories are created one by one
+
+    What to do next:
+    - Change PATH from char[] to t2fs_inode
+    - Extend mkdir to singleIndPtr
+    - Extend mkdir to doubleIndPtr
+
+    ISSUE:
+    - Memory problem on mkdir2;
+    - Refactor auxiliary functions from here to utils.h
 */
 
 #include <stdio.h>
@@ -51,7 +64,7 @@ char *bitmapInodes;
 
 int blockSize;
 
-char buffer[SECTOR_SIZE];
+char PATH[] = "/test";
 
 int identify2 (char *name, int size){
     /// NOTE: This function needs that *name are allocated as a char[size]
@@ -124,18 +137,21 @@ int write_inode(unsigned int position, struct t2fs_inode *inode){
 int write_records(unsigned int position, struct t2fs_record *records){
     // In: absolute position
     char blockBuffer[blockSize];
-    int isWrote;
+    int isWrote, isRead;
 
-    read_block(position,blockBuffer);
-    memcpy(blockBuffer, records, sizeof(struct t2fs_record));
+    isRead = read_block(position,blockBuffer);
 
-    isWrote = write_block(position,blockBuffer);
+    if(isRead == 0){
+        memcpy(blockBuffer, records, blockSize);
 
-    printf("RECORD --> Absolute address: %d\n",position); // just testing rounding!
+        isWrote = write_block(position,blockBuffer);
 
-    if(isWrote == 0) {
-        write_bitmap_blocks(position);
-        return 0;
+//        printf("RECORD --> Absolute address: %d\n",position); // just testing rounding!
+
+        if(isWrote == 0) {
+            write_bitmap_blocks(position);
+            return 0;
+        }
     }
 
     return -1;
@@ -147,13 +163,12 @@ int write_bitmap_blocks(unsigned int position){
     int bitIndex = (position % 8);
 
     position = floor(position / 8);
-    printf("\n---\nBmp_Inode \n-> position: %d\n-> bitIndex: %d",position,bitIndex);
 
     bitmapBlock[position] = ((mask<<bitIndex) ^ bitmapBlock[position]);
 
     write_block(superblock.BitmapBlocks,bitmapBlock);
 
-    test_bitmap_blocks();
+//    test_bitmap_blocks();
 
     return 0;
 }
@@ -167,11 +182,9 @@ int write_bitmap_inode(unsigned int position){
     position = floor(position / 8);
 
     bitmapInodes[position] = ((mask<<bitIndex) ^ bitmapInodes[position]);
-    printf("\n%d\n",bitmapInodes[position]);
-
     write_block(superblock.BitmapInodes,bitmapInodes);
 
-    test_bitmap_inodes();
+//    test_bitmap_inodes();
 
     return 0;
 }
@@ -240,39 +253,46 @@ int mkdir2 (char *pathname){
     char *subpath, lastFoundedSubpath[RECORD_MAX_NAME_SIZE];
     char *pathnameBuffer;
 
-    // Treating hardcoded parameter
-    pathnameBuffer = malloc(sizeof(*pathname));
-    strcpy(pathnameBuffer,pathname);
-
     // Verifying relative and absolute path
-    if(pathnameBuffer[0] == '/')
+    if(pathname[0] == '/')
         pathType = 0;
-    else if(pathnameBuffer[0] == '.')
+    else if(pathname[0] == '.')
         pathType = 1;
 
-    // Walking through inodes and checking subpaths
-    if(pathType == 0){
-        //*pathnameBuffer++;
-        //hitDirectory = 0; //     '/' has been hitted
-     } /// TODO: treat /
-    else{ } /// TODO: treat .
+    if(pathType == 0){ // treat ABSOLUTE path
+    //  Treating hardcoded parameter
+        pathnameBuffer = malloc(sizeof(*pathname));
+
+        strcpy(pathnameBuffer,pathname);
+
+    }
+    else{ // treat RELATIVE path
+    //  Treating hardcoded parameter
+        pathnameBuffer = malloc(sizeof(*pathname)+sizeof(*PATH));
+
+        strcpy(pathnameBuffer,PATH);
+        strcat(pathnameBuffer,(pathname+1)); // +1 is to begin after '.'
+    }
 
     i=1; // We don't need to look for root_inode
     isRead = read_inode(INODE_ROOT, &currentInode);
 
+// Walking through inodes and checking subpaths
     if(isRead == 0){
         subpath = strtok(pathnameBuffer,"/");
-        printf(">>SP = %s\n",subpath);
         if(subpath == NULL) return 0; /// TODO: and create diretory cause this is in root path or current path
 
         for(i=0; i < INODE_DATAPTR_SIZE; i++){
-            if(currentInode.dataPtr[i] != -1){
+            printf(">>SP = %s\n",subpath);
+            if(currentInode.dataPtr[i] != INODE_INVALID_ENTRY){
+                printf(">currentInode.dataPtr[i]: %d",currentInode.dataPtr[i]);
                 read_records_per_block(currentInode.dataPtr[i],currentRecord);
                 while(hitDirectory != 0 && currentRecord[j].TypeVal != -1 && j < RECORDS_PER_BLOCK){
                     hitDirectory = strcmp(currentRecord[j].name,subpath);
-                    printf("\nEm %d!\nSubpath: %s",j,subpath);
+                    printf("\nEm %d Subpath: %s",j,subpath);
                     j++;
                 }
+
                 if(hitDirectory == 0){
                     j--; // if j=-1 after this line then hitDirectory was on RootDir
                     printf("\n\nACHOU em %d!\nSubpath: %s",j,subpath);
@@ -281,16 +301,17 @@ int mkdir2 (char *pathname){
                     subpath = strtok(NULL,"/");
 
                     if(subpath != NULL){
-                        printf("subpath != NULL\n");
+                        printf("Proximo subpath: %s\n",subpath);
                         isRead = read_inode(currentRecord[j].i_node, &currentInode);
-                        j=0;
+                        printf("\n------ CurrentRecord inode is %d ------",currentRecord[j].i_node);
 
-                        if(isRead == 0) i=0;
+                        if(isRead == 0){ i=-1; j=0; hitDirectory = -1;}
                         else return ERROR_READ_INODE;
-                        printf("Sem erro de leitura!\n");
+                        printf("\n---------Sem erro de leitura!--------\n");
                     }
                     else{
                         // pathname already exists
+                        printf("path nullo!\n");
                         return 0;
                     }
                     printf("Passou!\n");
@@ -299,23 +320,24 @@ int mkdir2 (char *pathname){
             }
             else {
                 if(hitDirectory != 0) {
-                     printf("ENTROU com Last_SUBPATH => %s\n",subpath);
-                    /// TODO: Create new directory
+                     printf("\n----------------\nENTROU com Last_SUBPATH => %s\n-------\n",subpath);
+                    // test_inodes_and_records(); // DEBUG
+
                     // How? Simple! (if it works.. of course..)
 
                     // 1. Check free block and inode in their bitmaps
                     freeBlockPosition = get_free_block();
                     freeInodePosition = get_free_inode();
-                    printf("\n------\nfreeBlock: %d\nfreeInode: %d\n-----\n",freeBlockPosition,freeInodePosition);
+                    printf("\n-------------------\nfreeBlock: %d;;freeInode: %d-------------------\n",freeBlockPosition,freeInodePosition);
 
                     if(freeBlockPosition == ERROR_BITMAP_IS_FULL || freeInodePosition == ERROR_BITMAP_IS_FULL)
                         return ERROR_BITMAP_IS_FULL;
 
                     // 2. currentRecord append newPathname record
-                    //read_records_per_block(freeBlockPosition,currentRecord); /// TODO: test!
+                    // read_records_per_block(freeBlockPosition,currentRecord); /// TODO: test!
                     freeRecordPosition = add_record(currentRecord);
 
-                    printf("\n------\nfreeRecord: %d\n-----\n",freeRecordPosition);
+                    printf("\n-------------------freeRecord: %d-------------------\n",freeRecordPosition);
 
                     if(freeRecordPosition == -1) return ERROR_RECORD_BLOCK_IS_FULL; /// TODO: Look for another record in inode! until inode's end
 
@@ -332,8 +354,10 @@ int mkdir2 (char *pathname){
                     printf("Record BytesFileSize: %d\n", currentRecord[freeRecordPosition].bytesFileSize);
                     printf("Record Inode: %d\n\n", currentRecord[freeRecordPosition].i_node);
 
-                    // 3. Add a new pointer in newInode to the t2fs_record
-                    //newInode.dataPtr[0] = freeBlockPosition; /// TODO: other pointers to NULL
+                    printf("\n-------------------currentInode.dataPtr %d = %d;;FreeRecordPosition = %d-------------------\n",i,currentInode.dataPtr[i-1],freeRecordPosition);
+                    write_records(currentInode.dataPtr[i-1],currentRecord);
+
+                    // 3. Add a new pointer in newInode to the t2fs_recorda
                     init_records(newRecord);
 
                     newRecord[0].TypeVal = 2;
@@ -352,7 +376,7 @@ int mkdir2 (char *pathname){
                     newRecord[1].TypeVal = 2;
                     strcpy(newRecord[1].name,"..");
                     newRecord[1].blocksFileSize = 1;
-                    newRecord[1].bytesFileSize = 2;
+                    newRecord[1].bytesFileSize = newRecord[1].blocksFileSize * blockSize;
                     newRecord[1].i_node = currentRecord[0].i_node;
 
                     printf("\n===== Record Content (..) ======\n");
@@ -362,23 +386,22 @@ int mkdir2 (char *pathname){
                     printf("Record BytesFileSize: %d\n", newRecord[1].bytesFileSize);
                     printf("Record Inode: %d\n\n", newRecord[1].i_node);
 
-                    /// TODO: initialize newRecord
-                    //add_inode_record(&newInode,freeBlockPosition);
+                    init_inode(&newInode);
+                    add_inode_record(&newInode,freeBlockPosition);
 
-                    newInode.dataPtr[0] = freeBlockPosition;
-                    printf("newInode.dataPtr[0]= %d",newInode.dataPtr[0]);
+                    printf("\n-------------------newInode.dataPtr[0]= %d;; freeBlockPosition: %d-------------------\n",newInode.dataPtr[0],freeBlockPosition);
 
-                    // 4. Write newRecord in FirstDataBlock+freeBlockPosition
-                    //    and newInode in superblock.I-nodeBlock+freeInodePosition
+                    // 4.   Write newRecord in FirstDataBlock+freeBlockPosition
+                    //      and newInode in superblock.I-nodeBlock+freeInodePosition
+                    //      PS.: Mark in their bitmaps! ;)
                     write_inode(freeInodePosition,&newInode);
                     write_records(freeBlockPosition,newRecord);
-                    /// TODO: implement write_records_per_block(currentRecord/newRecord) with superblock.I-nodeBlock+position
-
-                    // 5. Mark that free block and that new inode in their bitmaps
 
                     return 0;
-                } else break;
-            };
+                } else {
+                    printf("Nao criou nada!\n");
+                }
+            }
         }
         // TODO: else: procurar nos SinglePtr
         // TODO: else: procurar nos DoublePtr
@@ -394,7 +417,13 @@ int rmdir2 (char *pathname){
     return 0;
 }
 
+int chdir2 (char *pathname){
+
+    return 0;
+}
+
 int init_superblock(){
+    char buffer[SECTOR_SIZE];
     int isRead = read_sector(0,&buffer[0]);
 
     if(isRead == 0){
@@ -453,19 +482,43 @@ int init_bitmap_inodes(){
     return -1;
 }
 
-/// FIXME: somehow it isn't initializing
 int init_records(struct t2fs_record *records){
     int i;
     for(i=0; i < RECORDS_PER_BLOCK; i++){
-        records[i].TypeVal = RECORD_INVALID_ENTRY;
-        strcpy(records[i].name,"");
-        records[i].blocksFileSize = 0;
-        records[i].bytesFileSize = 0;
-        records[i].i_node = INODE_INVALID_ENTRY;
+     //   if(records[i].TypeVal != 1 && records[i].TypeVal != 2){
+            records[i].TypeVal = RECORD_INVALID_ENTRY;
+            strcpy(records[i].name,"");
+            records[i].blocksFileSize = 0;
+            records[i].bytesFileSize = 0;
+            records[i].i_node = INODE_INVALID_ENTRY;
+
+//            printf("\n===== Record Content * ======\n");
+//            printf("Record Type: %d\n", records[i].TypeVal);
+//            printf("Record Name: %s\n", records[i].name);
+//            printf("Record BlocksFileSize: %d\n", records[i].blocksFileSize);
+//            printf("Record BytesFileSize: %d\n", records[i].bytesFileSize);
+//            printf("Record Inode: %d\n\n", records[i].i_node);
+   //     }
     }
 
     return 0;
 }
+
+int init_inode(struct t2fs_inode *inode){
+    char indPtr[blockSize];
+    int i = 0;
+
+    while(i < INODE_DATAPTR_SIZE){
+        inode->dataPtr[i] = INODE_INVALID_ENTRY;
+        i++;
+    }
+
+/// TODO: extend to singleIndPtr
+/// TODO: extend to doubleIndPtr
+
+    return -3;
+}
+
 int get_free_block(){
     // Out: return relative position of free block
     //      (eg. initial disk is occupated until position 67; free block is in position 68)
@@ -514,20 +567,25 @@ int get_free_inode(){
     return ERROR_BITMAP_IS_FULL;
 }
 
-int add_record(struct t2fs_record *record){
+int add_record(struct t2fs_record *records){
     //  In: record[RECORDS_PER_BLOCK]
     //  Out: new record position in record[RECORDS_PER_BLOCK];
     //  Append a new record
 
     int i = 0;
 
-    // TODO: search for an invalid t2fs_record (as t2fs_record.TypeVal == -1)
-    while(record[i].TypeVal != RECORD_INVALID_ENTRY && i < RECORDS_PER_BLOCK){
-        printf("\nRecordTypeVal => %d",record[i].TypeVal);
+    while(records[i].TypeVal != RECORD_INVALID_ENTRY && i < RECORDS_PER_BLOCK){
+        printf("\nRecord.Name => %s",records[i].name);
         i++;
     }
 
     if(i == RECORDS_PER_BLOCK) return ERROR_RECORD_BLOCK_IS_FULL; // it means there are no free records into the block
+
+    records[i].TypeVal = RECORD_INVALID_ENTRY;
+    strcpy(records[i].name,"");
+    records[i].blocksFileSize = 0;
+    records[i].bytesFileSize = 0;
+    records[i].i_node = INODE_INVALID_ENTRY;
 
     return i;
 }
@@ -541,6 +599,7 @@ int add_inode_record(struct t2fs_inode *inode, int recordPosition){
     int i = 0;
 
     while(i < INODE_DATAPTR_SIZE){
+        printf("->>>> ptr %d\n", i);
 
         if(inode->dataPtr[i] == INODE_INVALID_ENTRY){
             inode->dataPtr[i] = recordPosition;
@@ -548,21 +607,18 @@ int add_inode_record(struct t2fs_inode *inode, int recordPosition){
         }
         i++;
     }
-
-    i = 0;
-    read_block(inode->singleIndPtr,indPtr);
-    while(i < blockSize){
-         if(indPtr[i] == 0){
-            indPtr[i] = recordPosition;
-            return -2;
-        }
-        i++;
-    }
-
-
-    if(i == RECORDS_PER_BLOCK) return ERROR_RECORD_BLOCK_IS_FULL; // it means there are no free records into the block
-
-
+/// TODO: extend to singleIndPtr
+/// TODO: extend to doubleIndPtr
+//    i = 0;
+//    read_block(inode->singleIndPtr,indPtr);
+//    while(i < blockSize){
+//         if(indPtr[i] == 0){
+//            indPtr[i] = recordPosition;
+//            return -2;
+//        }
+//        i++;
+//    }
+//
     return -3;
 }
 
@@ -633,24 +689,28 @@ void test_inodes_and_records(){
     struct t2fs_inode *inode;
     char blockBuffer[blockSize];
     struct t2fs_record recordBuffer[RECORDS_PER_BLOCK];
-    int i=0;
+    int i;
+    int isRead;
 
-    int isRead = read_inode(1, inode);
+    for(i=0;i<3;i++){
+        isRead = read_inode(i, inode);
 
-    if(isRead == 0){
-        printf("\n===== Inode Content ======\n");
-        printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
-        read_records_per_block(inode->dataPtr[0], recordBuffer);
+        if(isRead == 0){
+            printf("\n===== Inode Content %d======\n",i);
+            printf("Inode-- DataPtr: %d\n", inode->dataPtr[0]);
+            printf("Inode-- DataPtr: %d\n", inode->dataPtr[1]);
+            printf("Inode-- DataPtr: %d\n", inode->dataPtr[2]);
+          //  read_records_per_block(inode->dataPtr[0], recordBuffer);
+        }
+        else { printf("ERRO ao ler teste inode!\n"); }
     }
-    inode = NULL;
-
 }
 
 void test_records(){
     struct t2fs_record recordBuffer[RECORDS_PER_BLOCK];
     int i,j;
 
-    for(i=0; i < 2; i++){
+    for(i=0; i < 3; i++){
         read_records_per_block(ADDRESS_ABSOLUTE_RECORD(i), recordBuffer);
         for(j=0; j<RECORDS_PER_BLOCK; j++){
             printf("\n===== Record Content ======\n");
